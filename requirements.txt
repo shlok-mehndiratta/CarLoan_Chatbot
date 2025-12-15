@@ -1,7 +1,7 @@
 fastapi>=0.95.0
+uvicorn>=0.22.0
 uvicorn[standard]>=0.22.0
 python-dotenv>=1.0.0
 python-multipart>=0.0.6
-langchain_openai>=0.0.0   # keep what you already used; if pip name differs, use the installed package you have
-openai>=1.0.0
+langchain-ollama>=0.1.0  # Added for Ollama integration
 PyPDF2>=3.0.0

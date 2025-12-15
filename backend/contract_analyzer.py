@@ -1,47 +1,51 @@
-import os
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+import os
+from langchain_ollama import ChatOllama
 
-# Load .env local to this file
-current_dir = os.path.dirname(os.path.abspath(__file__))
+#Load .env
+current_dir = os.path.dirname(__file__)
 env_path = os.path.join(current_dir, ".env")
 load_dotenv(env_path)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+print("API KEY LOADED:", OPENAI_API_KEY is not None)
 
-if not OPENAI_API_KEY:
-    # fail fast with clear error so uvicorn start reveals the problem
-    raise RuntimeError("OPENAI_API_KEY not set. Create backend/.env with OPENAI_API_KEY=sk-...")
-
-# Create LLM client (sync usage). We pass the key explicitly to guarantee client has it.
-llm = ChatOpenAI(
+llm = ChatOllama(
     temperature=0,
-    model="gpt-4o-mini",
-    api_key=OPENAI_API_KEY
+    model="qwen3:8b"
 )
 
-def build_prompt(contract_text: str) -> str:
-    """Construct the analysis prompt. Keep it focused and constrained."""
-    
-    return f"""
-    You are an expert in car lease and auto loan contract analysis. Read the contract text and produce a concise, structured analysis.
-
-    Return JSON with fields:
-    - total_payment_terms: short summary of what the consumer will pay (amounts, schedules if present)
-    - apr_and_risks: mention APR, finance charges, and any financial risk indicators
-    - fees_and_penalties: enumerated fees, early termination penalties, late fees, hidden charges
-    - unsafe_conditions: clauses that are probably harmful to the customer (bullet list)
-    - missing_disclosures: required disclosures that appear absent (bullet list)
-    - negotiation_items: recommended negotiation points (bullet list)
-    - overall_summary: one paragraph summary and recommended next step
-
-    ContractText:
-    {contract_text}
-    """
-
-def analyze_contract(contract_text: str) -> str:
-    """Send prompt to LLM and return LLM response (raw)."""
-    prompt = build_prompt(contract_text)
-    # llm.invoke() returns the model output in your earlier setup — use that
-    response = llm.invoke(prompt)
-    return response
+def analyze_contract(text: str):
+    return {
+        "loan_type": "lease",
+        "apr_percent": None,
+        "monthly_payment": None,
+        "term_months": None,
+        "down_payment": None,
+        "finance_amount": None,
+        "fees": {
+            "documentation_fee": None,
+            "acquisition_fee": None,
+            "registration_fee": None,
+            "other_fees": None
+        },
+        "penalties": {
+            "late_payment": None,
+            "early_termination": None,
+            "over_mileage": None
+        },
+        "lease_specific": {
+            "residual_value": None,
+            "mileage_allowance": None,
+            "buyout_price": None
+        },
+        "vehicle": {
+            "vin": None,
+            "make": None,
+            "model": None,
+            "year": None
+        },
+        "red_flags": [],
+        "fairness_score": None,
+        "note": "LLM disabled – quota exceeded"
+    }
