@@ -37,8 +37,9 @@ def create_sla_table():
         CREATE TABLE IF NOT EXISTS sla_extractions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             contract_id INTEGER,
-            sla_json TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            sla_json TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (contract_id) REFERENCES contracts(id)
         )
     """)
     conn.commit()
