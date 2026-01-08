@@ -161,17 +161,28 @@ def analyze_contract(contract_text: str) -> dict:
 
     if penalties["early_termination"] != "No penalty":
         negotiation_points.append("Reduce early termination penalty")
+    
+    #------------VIN EXTRACTION--------------#
+    vin = extract_vin(text)
+    vehicle_details = {}
+    if vin:
+        try:
+            vehicle_details = get_vehicle_details(vin)
+        except Exception:
+            vehicle_details = {}
 
     # ---------------- FINAL JSON ---------------- #
     return {
-        "loan_type": loan_type,
-        "apr_percent": apr_percent,
-        "monthly_payment": monthly_payment,
-        "term_months": term_months,
-        "down_payment": down_payment,
-        "finance_amount": finance_amount,
-        "fees": fees,
-        "penalties": penalties,
-        "red_flags": red_flags,
-        "negotiation_points": negotiation_points
-    }
+    "vin": vin,
+    "vehicle_details": vehicle_details,
+    "loan_type": loan_type,
+    "apr_percent": apr_percent,
+    "monthly_payment": monthly_payment,
+    "term_months": term_months,
+    "down_payment": down_payment,
+    "finance_amount": finance_amount,
+    "fees": fees,
+    "penalties": penalties,
+    "red_flags": red_flags,
+    "negotiation_points": negotiation_points
+}

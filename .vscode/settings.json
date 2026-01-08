@@ -1,0 +1,13 @@
+{
+    "ROS2.distro": "jazzy",
+    "python.autoComplete.extraPaths": [
+        "/home/shlok-mehndiratta/turtlebot3_ws/build/ugv_uav_control",
+        "/home/shlok-mehndiratta/turtlebot3_ws/install/ugv_uav_control/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/shlok-mehndiratta/turtlebot3_ws/build/ugv_uav_control",
+        "/home/shlok-mehndiratta/turtlebot3_ws/install/ugv_uav_control/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ]
+}
