@@ -30,6 +30,7 @@ datasets/
 
 # Environment variables
 .env
+.vscode
 
 # System files
 .DS_Store
