@@ -35,5 +35,5 @@ datasets/
 .DS_Store
 Thumbs.db
 
-# *.db
+*.db
 /.vscode/
