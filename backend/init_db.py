@@ -1,6 +1,6 @@
-from db import create_contracts_table, create_sla_table
+from backend.db import create_contracts_table, create_sla_table
 
-create_contracts_table()
-create_sla_table()
-
-print("Database initialized successfully")
+if __name__ == "__main__":
+    create_contracts_table()
+    create_sla_table()
+    print("Database initialized")
