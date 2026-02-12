@@ -10,27 +10,35 @@ Endpoints:
   GET  /vin/{vin}/recalls      — dedicated VIN recalls lookup
   POST /price-estimate         — estimate vehicle price from make/model/year
   GET  /price-estimate/{vin}   — estimate price via VIN decode
+  POST /negotiate/start        — start a negotiation thread for a contract
+  POST /negotiate/chat         — send a message in a negotiation thread
+  GET  /negotiate/history/{id} — retrieve chat history for a thread
+  POST /negotiate/email        — generate a negotiation email
 """
 
+import json
 import logging
 import traceback
 
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 from backend.db import (
     init_db, save_contract, save_sla, save_extracted_clauses,
     get_contract, get_sla_for_contract,
     save_price_recommendation,
+    create_negotiation_thread, save_negotiation_message, get_negotiation_history,
 )
 from backend.pdf_reader import extract_text_from_pdf
 from backend.contract_analyzer import analyze_contract, merge_rule_and_llm
 from backend.llm_sla_extracter import extract_sla_with_llm
 from backend.vin_service import get_vehicle_details, get_recalls_for_vin
 from backend.fairness_engine import calculate_fairness_score
-from backend.negotiation_assistant import generate_negotiation_points
+from backend.negotiation_assistant import (
+    generate_negotiation_points, chat_with_negotiator, generate_negotiation_email,
+)
 from backend.price_service import estimate_price, estimate_price_from_vin, compare_contract_to_market
 
 logging.basicConfig(level=logging.INFO)
@@ -40,8 +48,8 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Car Lease / Loan Contract Review API",
-    version="3.0",
-    description="AI-powered contract analysis, VIN intelligence, and price estimation",
+    version="4.0",
+    description="AI-powered contract analysis, VIN intelligence, price estimation, and negotiation chatbot",
 )
 
 app.add_middleware(
@@ -63,7 +71,7 @@ def startup():
 
 @app.get("/")
 def home():
-    return {"message": "Car Loan / Lease AI API is running", "version": "3.0"}
+    return {"message": "Car Loan / Lease AI API is running", "version": "4.0"}
 
 
 @app.get("/health")
@@ -291,3 +299,205 @@ def price_estimate_by_vin(vin: str):
     except Exception:
         traceback.print_exc()
         return {"error": "VIN-based price estimation failed"}
+
+
+# ──────────────────── Negotiation Chatbot ──────────────────── #
+
+class NegotiationStartRequest(BaseModel):
+    contract_id: int
+    title: Optional[str] = None
+
+
+class NegotiationChatRequest(BaseModel):
+    thread_id: int
+    message: str
+
+
+class NegotiationEmailRequest(BaseModel):
+    contract_id: int
+    specific_requests: Optional[List[str]] = None
+    tone: str = "professional"
+
+
+@app.post("/negotiate/start")
+def negotiate_start(req: NegotiationStartRequest):
+    """
+    Start a new negotiation session for a contract.
+    Loads contract context and creates a negotiation thread.
+    Returns the thread_id, initial negotiation points, and a welcome message.
+    """
+    try:
+        # Load contract analysis
+        contract = get_contract(req.contract_id)
+        if not contract:
+            return {"error": "Contract not found"}
+
+        sla_record = get_sla_for_contract(req.contract_id)
+        if not sla_record:
+            return {"error": "No analysis found for this contract. Run /analyze first."}
+
+        # Parse stored analysis
+        analysis = sla_record.get("sla_json")
+        if isinstance(analysis, str):
+            analysis = json.loads(analysis)
+
+        sla = analysis.get("sla", {})
+        fairness = analysis.get("fairness", {})
+        price_comp = analysis.get("price_comparison")
+        neg_points = analysis.get("negotiation_points", [])
+
+        # Build context for the chatbot
+        context = {
+            "sla": sla,
+            "fairness": fairness,
+            "price_comparison": price_comp,
+            "negotiation_points": neg_points,
+        }
+
+        # Create thread in DB
+        title = req.title or f"Negotiation for contract #{req.contract_id}"
+        thread_id = create_negotiation_thread(
+            contract_id=req.contract_id,
+            context_json=json.dumps(context),
+            title=title,
+        )
+
+        # Generate fresh negotiation points
+        points = generate_negotiation_points(sla, fairness)
+
+        # Generate welcome message
+        score = fairness.get("fairness_score", "N/A")
+        rating = fairness.get("rating", "")
+        welcome = (
+            f"Welcome to your negotiation session! I've analyzed your contract "
+            f"(fairness score: {score}/100 — {rating}). "
+            f"I have {len(points)} key negotiation points ready. "
+            f"Ask me about any aspect of your contract, and I'll provide "
+            f"specific strategies and talking points. You can also ask me to "
+            f"draft a negotiation email when you're ready."
+        )
+
+        # Save welcome message
+        save_negotiation_message(thread_id, "assistant", welcome)
+
+        return {
+            "thread_id": thread_id,
+            "contract_id": req.contract_id,
+            "welcome_message": welcome,
+            "negotiation_points": points,
+            "fairness": fairness,
+        }
+
+    except Exception:
+        traceback.print_exc()
+        return {"error": "Failed to start negotiation session"}
+
+
+@app.post("/negotiate/chat")
+def negotiate_chat(req: NegotiationChatRequest):
+    """
+    Send a message in the negotiation chat.
+    Returns the AI's context-aware response.
+    """
+    try:
+        # Save user message
+        save_negotiation_message(req.thread_id, "user", req.message)
+
+        # Load thread context
+        from backend.db import get_connection
+        conn = get_connection()
+        thread = conn.execute(
+            "SELECT contract_id, context_json FROM negotiation_threads WHERE id = ?",
+            (req.thread_id,)
+        ).fetchone()
+        conn.close()
+
+        if not thread:
+            return {"error": "Negotiation thread not found"}
+
+        # Parse context
+        context = None
+        if thread["context_json"]:
+            try:
+                context = json.loads(thread["context_json"])
+            except json.JSONDecodeError:
+                pass
+
+        # Load chat history
+        history = get_negotiation_history(req.thread_id)
+
+        # Get AI response
+        response = chat_with_negotiator(
+            user_message=req.message,
+            context=context,
+            chat_history=history[:-1],  # exclude the message we just saved
+        )
+
+        # Save assistant response
+        save_negotiation_message(req.thread_id, "assistant", response)
+
+        return {
+            "thread_id": req.thread_id,
+            "response": response,
+            "message_count": len(history) + 1,  # +1 for the assistant message
+        }
+
+    except Exception:
+        traceback.print_exc()
+        return {"error": "Chat failed"}
+
+
+@app.get("/negotiate/history/{thread_id}")
+def negotiate_history(thread_id: int):
+    """Retrieve full chat history for a negotiation thread."""
+    try:
+        history = get_negotiation_history(thread_id)
+        return {
+            "thread_id": thread_id,
+            "messages": history,
+            "message_count": len(history),
+        }
+    except Exception:
+        traceback.print_exc()
+        return {"error": "Failed to retrieve history"}
+
+
+@app.post("/negotiate/email")
+def negotiate_email(req: NegotiationEmailRequest):
+    """
+    Generate a professional negotiation email for a contract.
+    Uses contract analysis as context to draft specific, actionable communication.
+    """
+    try:
+        # Load contract analysis
+        sla_record = get_sla_for_contract(req.contract_id)
+        if not sla_record:
+            return {"error": "No analysis found for this contract. Run /analyze first."}
+
+        analysis = sla_record.get("sla_json")
+        if isinstance(analysis, str):
+            analysis = json.loads(analysis)
+
+        context = {
+            "sla": analysis.get("sla", {}),
+            "fairness": analysis.get("fairness", {}),
+            "price_comparison": analysis.get("price_comparison"),
+            "negotiation_points": analysis.get("negotiation_points", []),
+        }
+
+        # Generate email
+        email = generate_negotiation_email(
+            context=context,
+            specific_requests=req.specific_requests,
+            tone=req.tone,
+        )
+
+        return {
+            "contract_id": req.contract_id,
+            "tone": req.tone,
+            "email": email,
+        }
+
+    except Exception:
+        traceback.print_exc()
+        return {"error": "Email generation failed"}
