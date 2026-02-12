@@ -2,11 +2,12 @@
 FastAPI backend — Car Lease / Loan Contract Review & Negotiation API
 
 Endpoints:
-  GET  /              — health banner
-  GET  /health        — health check
-  POST /analyze       — upload PDF → SLA extraction (rule + LLM) + fairness
-  GET  /vin/{vin}     — decode VIN via NHTSA
-  GET  /contract/{id} — retrieve saved analysis
+  GET  /                  — health banner
+  GET  /health            — health check
+  POST /analyze           — upload PDF → SLA extraction (rule + LLM) + fairness
+  GET  /contract/{id}     — retrieve saved analysis
+  GET  /vin/{vin}         — full VIN decode + recalls + complaints
+  GET  /vin/{vin}/recalls — dedicated VIN recalls lookup
 """
 
 import logging
@@ -22,7 +23,7 @@ from backend.db import (
 from backend.pdf_reader import extract_text_from_pdf
 from backend.contract_analyzer import analyze_contract, merge_rule_and_llm
 from backend.llm_sla_extracter import extract_sla_with_llm
-from backend.vin_service import get_vehicle_details
+from backend.vin_service import get_vehicle_details, get_recalls_for_vin
 from backend.fairness_engine import calculate_fairness_score
 from backend.negotiation_assistant import generate_negotiation_points
 
@@ -164,9 +165,26 @@ def get_contract_analysis(contract_id: int):
 
 @app.get("/vin/{vin}")
 def vin_lookup(vin: str):
-    """Decode VIN and fetch basic vehicle information using public NHTSA API."""
+    """
+    Full VIN lookup: decode vehicle + fetch recalls + fetch complaints.
+    Returns comprehensive vehicle information from NHTSA.
+    """
     try:
+        if len(vin) != 17:
+            return {"error": "VIN must be exactly 17 characters"}
         return get_vehicle_details(vin)
     except Exception:
         traceback.print_exc()
         return {"error": "VIN lookup failed"}
+
+
+@app.get("/vin/{vin}/recalls")
+def vin_recalls(vin: str):
+    """Dedicated endpoint for VIN-based recall lookup."""
+    try:
+        if len(vin) != 17:
+            return {"error": "VIN must be exactly 17 characters"}
+        return get_recalls_for_vin(vin)
+    except Exception:
+        traceback.print_exc()
+        return {"error": "Recall lookup failed"}
