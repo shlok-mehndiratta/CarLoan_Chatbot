@@ -1,6 +1,6 @@
-from backend.db import create_contracts_table, create_sla_table
+"""Initialize the database with the full schema."""
+from backend.db import init_db
 
 if __name__ == "__main__":
-    create_contracts_table()
-    create_sla_table()
-    print("Database initialized")
+    init_db()
+    print("✅ Database initialized with full schema")
