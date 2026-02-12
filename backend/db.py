@@ -389,3 +389,53 @@ def get_negotiation_history(thread_id: int) -> list:
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+# ---- Price Recommendations ----
+
+def save_price_recommendation(vehicle_id: int = None, contract_id: int = None,
+                               source: str = "depreciation_model",
+                               result: dict = None) -> int:
+    """Save a price estimation result to the database."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO price_recommendations
+           (vehicle_id, contract_id, low_price, market_price, high_price,
+            confidence, data_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (
+            vehicle_id,
+            contract_id,
+            result.get("low_price") if result else None,
+            result.get("market_price") if result else None,
+            result.get("high_price") if result else None,
+            result.get("confidence") if result else None,
+            json.dumps(result) if result else None,
+        )
+    )
+    rec_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return rec_id
+
+
+def get_price_recommendations(vehicle_id: int = None, contract_id: int = None) -> list:
+    """Retrieve price recommendations, filtered by vehicle or contract."""
+    conn = get_connection()
+    if vehicle_id:
+        rows = conn.execute(
+            "SELECT * FROM price_recommendations WHERE vehicle_id = ? ORDER BY id DESC",
+            (vehicle_id,)
+        ).fetchall()
+    elif contract_id:
+        rows = conn.execute(
+            "SELECT * FROM price_recommendations WHERE contract_id = ? ORDER BY id DESC",
+            (contract_id,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM price_recommendations ORDER BY id DESC LIMIT 20"
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
