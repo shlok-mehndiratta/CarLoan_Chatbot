@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  # ───────────── Backend API ───────────── #
+  backend:
+    build: .
+    container_name: car-contract-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - DATABASE_PATH=/app/data/database.db
+    volumes:
+      - db_data:/app/data
+      - ./uploads:/app/uploads
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ───────────── Ollama LLM ───────────── #
+  ollama:
+    image: ollama/ollama:latest
+    container_name: car-contract-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # After first run, pull the model:
+    #   docker exec car-contract-ollama ollama pull llama3.2
+
+volumes:
+  db_data:
+  ollama_data:
