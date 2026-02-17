@@ -1,10 +1,10 @@
-# 🚗 AI-Powered Car Lease & Loan Contract Review & Negotiation Assistant
+# AI-Powered Car Lease & Loan Contract Review & Negotiation Assistant
 
 > Developed as part of the **Infosys Virtual Internship Program**
 
 ---
 
-## 📌 Overview
+## Overview
 
 The **Car Lease / Loan Contract Review & Negotiation Assistant** is an AI-powered application that helps users understand, analyze, and negotiate car lease or loan agreements.
 
@@ -14,7 +14,7 @@ Car financing contracts are often long, complex, and filled with financial terms
 
 ---
 
-## 🎯 Problem Statement
+## Problem Statement
 
 Most consumers sign auto lease or loan contracts without fully understanding:
 
@@ -29,7 +29,7 @@ This creates **information asymmetry** between dealers and customers. This proje
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
 ### 1️⃣ AI-Based Contract Analysis
 Upload a lease/loan contract (PDF or image), and the system extracts:
@@ -137,7 +137,7 @@ CARChatbot/
 
 ---
 
-## 🔌 API Endpoints
+## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -225,7 +225,7 @@ The fairness score (0–100) is computed across 6 dimensions:
 
 ---
 
-## 🧪 Test Coverage
+## Test Coverage
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
